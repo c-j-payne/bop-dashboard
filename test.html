@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viam Connection Test</title>
+</head>
+<body>
+    <h1>Viam Connection Test</h1>
+    <button id="connectBtn">Connect to Robot</button>
+    <div id="output" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; min-height: 200px;"></div>
+
+    <script type="module">
+        import * as VIAM from 'https://esm.sh/@viamrobotics/sdk';
+        
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = 'Attempting to connect...';
+            
+            try {
+                const host = 'bop2025-main.1qcq9pmop4.viam.cloud';
+                outputDiv.innerHTML += '<br>Connecting to: ' + host;
+                
+                const machine = await VIAM.createRobotClient({
+                    host,
+                    credentials: {
+                        type: 'api-key',
+                        payload: 'hxtk88rojiq2pzc7nasiiymnbfxr1dyc',
+                        authEntity: '2597529f-b98b-4e62-8c94-7f99501b0a76',
+                    },
+                    signalingAddress: 'https://app.viam.com:443',
+                });
+                
+                outputDiv.innerHTML += '<br>Connected successfully!';
+                outputDiv.innerHTML += '<br>Getting resources...';
+                
+                const resources = await machine.resourceNames();
+                outputDiv.innerHTML += '<br>Resources: ' + JSON.stringify(resources);
+                
+                // Try to access camera
+                try {
+                    outputDiv.innerHTML += '<br>Trying to access camera-1...';
+                    const camera1Client = new VIAM.CameraClient(machine, 'camera-1');
+                    const image = await camera1Client.getImage();
+                    outputDiv.innerHTML += '<br>Successfully got image from camera!';
+                } catch (cameraError) {
+                    outputDiv.innerHTML += '<br>Camera error: ' + cameraError.message;
+                }
+                
+            } catch (error) {
+                outputDiv.innerHTML += '<br><span style="color: red;">Error: ' + error.message + '</span>';
+                console.error('Connection error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

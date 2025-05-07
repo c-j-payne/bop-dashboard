@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viam Robot Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        header {
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .camera-feed {
+            width: 100%;
+            min-height: 300px;
+            background-color: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        .camera-feed img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 4px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .connect-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .disconnect-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .sensor-card {
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sensor-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+    <script type="module">
+        import * as VIAM from 'https://esm.sh/@viamrobotics/sdk';
+        
+        // Global variables
+        let robotClient = null;
+        let cameraInterval = null;
+        let sensorsInterval = null;
+        
+        // When page loads
+        window.onload = function() {
+            document.getElementById('connectBtn').addEventListener('click', connect);
+            document.getElementById('disconnectBtn').addEventListener('click', disconnect);
+            
+            // Initially disable disconnect button
+            document.getElementById('disconnectBtn').disabled = true;
+        };
+        
+        // Connect to robot
+        async function connect() {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.innerHTML = 'Connecting...';
+            statusDiv.style.color = 'blue';
+            
+            try {
+                const host = 'bop2025-main.1qcq9pmop4.viam.cloud';
+                
+                // Create robot client
+                robotClient = await VIAM.createRobotClient({
+                    host,
+                    credentials: {
+                        type: 'api-key',
+                        payload: 'hxtk88rojiq2pzc7nasiiymnbfxr1dyc',
+                        authEntity: '2597529f-b98b-4e62-8c94-7f99501b0a76',
+                    },
+                    signalingAddress: 'https://app.viam.com:443',
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+                
+                // Get resources
+                const resources = await robotClient.resourceNames();
+                console.log('Resources:', resources);
+                
+                // Update UI
+                statusDiv.innerHTML = 'Connected';
+                statusDiv.style.color = 'green';
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                
+                // Start data fetching
+                startCameraFeed();
+                startSensorUpdates();
+                
+            } catch (error) {
+                statusDiv.innerHTML = 'Connection failed: ' + error.message;
+                statusDiv.style.color = 'red';
+                console.error('Connection error:', error);
+            }
+        }
+        
+        // Disconnect from robot
+        function disconnect() {
+            if (robotClient) {
+                // Clear intervals
+                if (cameraInterval) clearInterval(cameraInterval);
+                if (sensorsInterval) clearInterval(sensorsInterval);
+                
+                // Update UI
+                document.getElementById('connectionStatus').innerHTML = 'Disconnected';
+                document.getElementById('connectionStatus').style.color = 'gray';
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                
+                // Clear camera feed
+                document.getElementById('cameraFeed').innerHTML = '<div style="color: gray;">Disconnected</div>';
+                
+                // Clear sensor readings
+                document.querySelectorAll('.sensor-value').forEach(el => {
+                    el.textContent = '-';
+                });
+                
+                // Reset client
+                robotClient = null;
+            }
+        }
+        
+        // Start camera feed updates
+        function startCameraFeed() {
+            updateCameraFeed();
+            cameraInterval = setInterval(updateCameraFeed, 1000); // Update every 1 second
+        }
+        
+        // Update camera feed
+        async function updateCameraFeed() {
+            try {
+                if (!robotClient) return;
+                
+                const cameraClient = new VIAM.CameraClient(robotClient, 'camera-1');
+                const image = await cameraClient.getImage();
+                
+                // Convert image bytes to base64
+                const uint8Array = new Uint8Array(image);
+                const binary = [...uint8Array].map(byte => String.fromCharCode(byte)).join('');
+                const base64Image = btoa(binary);
+                
+                // Update image in the DOM
+                document.getElementById('cameraFeed').innerHTML = `
+                    <img src="data:image/jpeg;base64,${base64Image}" alt="Camera Feed">
+                `;
+            } catch (error) {
+                console.error('Error updating camera feed:', error);
+                document.getElementById('cameraFeed').innerHTML = `
+                    <div style="color: red;">Camera error: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // Start sensor updates
+        function startSensorUpdates() {
+            updateSensors();
+            sensorsInterval = setInterval(updateSensors, 2000); // Update every 2 seconds
+        }
+        
+        // Update sensor readings
+        async function updateSensors() {
+            try {
+                if (!robotClient) return;
+                
+                // Get readings from temperature sensor
+                const temperatureSensor = new VIAM.SensorClient(robotClient, 'temperature');
+                const tempReadings = await temperatureSensor.getReadings();
+                
+                // Display the temperature reading
+                const tempElement = document.getElementById('temperatureValue');
+                if (tempReadings && tempReadings.temperature) {
+                    tempElement.textContent = tempReadings.temperature.toFixed(1) + '°C';
+                } else {
+                    tempElement.textContent = 'N/A';
+                }
+                
+                // Get readings from sensor-1
+                const sensor1 = new VIAM.SensorClient(robotClient, 'sensor-1');
+                const sensor1Readings = await sensor1.getReadings();
+                
+                // Display the sensor readings
+                const sensor1Element = document.getElementById('sensor1Value');
+                if (sensor1Readings) {
+                    // Just display the first reading
+                    const firstKey = Object.keys(sensor1Readings)[0];
+                    if (firstKey) {
+                        sensor1Element.textContent = sensor1Readings[firstKey];
+                    } else {
+                        sensor1Element.textContent = 'No data';
+                    }
+                } else {
+                    sensor1Element.textContent = 'N/A';
+                }
+                
+                // Get readings from gateway-waveshare
+                const gateway = new VIAM.SensorClient(robotClient, 'gateway-waveshare');
+                const gatewayReadings = await gateway.getReadings();
+                
+                // Display the gateway reading
+                const gatewayElement = document.getElementById('gatewayValue');
+                if (gatewayReadings) {
+                    // Just display the first reading
+                    const firstKey = Object.keys(gatewayReadings)[0];
+                    if (firstKey) {
+                        gatewayElement.textContent = gatewayReadings[firstKey];
+                    } else {
+                        gatewayElement.textContent = 'No data';
+                    }
+                } else {
+                    gatewayElement.textContent = 'N/A';
+                }
+            } catch (error) {
+                console.error('Error updating sensors:', error);
+            }
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Viam Robot Dashboard</h1>
+        <div class="controls">
+            <button id="connectBtn" class="connect-btn">Connect</button>
+            <button id="disconnectBtn" class="disconnect-btn">Disconnect</button>
+            <span id="connectionStatus" style="margin-left: 10px; color: gray;">Not connected</span>
+        </div>
+    </header>
+    
+    <div class="dashboard">
+        <div class="card">
+            <h2>Camera Feed</h2>
+            <div id="cameraFeed" class="camera-feed">
+                <div style="color: gray;">Not connected</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Sensor Readings</h2>
+            <div class="sensor-grid">
+                <div class="sensor-card">
+                    <h3>Temperature</h3>
+                    <div id="temperatureValue" class="sensor-value">-</div>
+                </div>
+                <div class="sensor-card">
+                    <h3>Sensor 1</h3>
+                    <div id="sensor1Value" class="sensor-value">-</div>
+                </div>
+                <div class="sensor-card">
+                    <h3>Gateway</h3>
+                    <div id="gatewayValue" class="sensor-value">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
