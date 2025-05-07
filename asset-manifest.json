@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/bop-dashboard/static/js/main.1efd7295.js",
+    "main.js": "/bop-dashboard/static/js/main.f410b08d.js",
     "index.html": "/bop-dashboard/index.html",
-    "main.1efd7295.js.map": "/bop-dashboard/static/js/main.1efd7295.js.map"
+    "main.f410b08d.js.map": "/bop-dashboard/static/js/main.f410b08d.js.map"
   },
   "entrypoints": [
-    "static/js/main.1efd7295.js"
+    "static/js/main.f410b08d.js"
   ]
 }
