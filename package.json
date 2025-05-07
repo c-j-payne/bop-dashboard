@@ -2,6 +2,7 @@
     "name": "viam-dashboard",
     "version": "0.1.0",
     "private": true,
+    "homepage": "https://c-j-payne.github.io/bop-dashboard",
     "dependencies": {
         "@testing-library/jest-dom": "^5.16.5",
         "@testing-library/react": "^13.4.0",
@@ -48,5 +49,3 @@
         "typescript": "^3.4.5"
     }
 }
-
-
